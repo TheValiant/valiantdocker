@@ -73,33 +73,39 @@ RUN echo "deb http://deb.debian.org/debian/ experimental main contrib non-free n
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install --no-install-recommends --no-install-suggests -y \
     gcc \
-    llvm-19 \
     make \
     gdb \
     valgrind \
     cppcheck \
     ltrace \
     strace \
-    clang-19 \
     vim \
     zsh \
     curl \
     ca-certificates \
     git \
-    clang-tidy-19 \
     bear \
     g++ \
     zsh-theme-powerlevel9k \
-    libclang-rt-19-dev \
+    llvm-21 \
+    libclang-rt-21-dev \
+    clang-tools-21 \
+    clang-tidy-21 \
+    clang-21 \
     libreadline-dev && \
     apt-get clean
+
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-21 100 \
+    && update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-21 100 \
+    && update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-21 100 \
+    && update-alternatives --install /usr/bin/cc cc /usr/bin/clang 100 \
+    && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++ 100
 
 # Install Oh My Zsh
 RUN sh -c "\$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
 # Add aliases to .zshrc
-RUN echo "alias clang='clang-19'\nalias clang-tidy='clang-tidy-19'\nalias cc='clang-19'" >> ~/.zshrc
-RUN echo "alias clang++='clang++-19'\nalias val=' valgrind --leak-check=full --leak-resolution=high -s --show-leak-kinds=all --leak-check-heuristics=all --num-callers=500 --sigill-diagnostics=yes --track-origins=yes --undef-value-errors=yes'" >> ~/.zshrc
+RUN echo "val=' valgrind --leak-check=full --leak-resolution=high -s --show-leak-kinds=all --leak-check-heuristics=all --num-callers=500 --sigill-diagnostics=yes --track-origins=yes --undef-value-errors=yes'" >> ~/.zshrc
 
 ENV TSAN_OPTIONS="second_deadlock_stack=1,history_size=7,memory_limit_mb=4096,detect_deadlocks=1" ASAN_OPTIONS="detect_leaks=1,leak_check_at_exit=true,leak_check=true,debug=true"
 ENV TERM="xterm-256color"
