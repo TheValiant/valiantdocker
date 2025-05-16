@@ -99,6 +99,7 @@ RUN sh -c "\$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/maste
 
 # Add aliases to .zshrc
 RUN echo "alias clang='clang-19'\nalias clang-tidy='clang-tidy-19'\nalias cc='clang-19'" >> ~/.zshrc
+RUN echo "alias clang++='clang++-19'\nalias val=' valgrind --leak-check=full --leak-resolution=high -s --show-leak-kinds=all --leak-check-heuristics=all --num-callers=500 --sigill-diagnostics=yes --track-origins=yes --undef-value-errors=yes'" >> ~/.zshrc
 
 ENV TSAN_OPTIONS="second_deadlock_stack=1,history_size=7,memory_limit_mb=4096,detect_deadlocks=1" ASAN_OPTIONS="detect_leaks=1,leak_check_at_exit=true,leak_check=true,debug=true"
 ENV TERM="xterm-256color"
