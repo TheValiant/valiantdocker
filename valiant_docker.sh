@@ -5,7 +5,7 @@ printf "\033[31mChecking if Docker is running...\033[0m\n"
 if ! pgrep -x "dockerd" > /dev/null; then
     printf "\033[31mDocker is not running. Starting Docker...\033[0m\n"
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        open -a /Applications/Docker.app
+            mkdir -p ~/goinfre/com.docker.docker && rm -rf ~/Library/Containers/com.docker.docker && ln -s ~/goinfre/com.docker.docker ~/Library/Containers/com.docker.docker && open -a /Applications/Docker.app
     else
         sudo systemctl start docker
     fi
