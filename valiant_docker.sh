@@ -95,7 +95,7 @@ RUN apt-get update && apt-get upgrade -y && \
     libbsd-dev \
     build-essential \
     libx11-dev \
-    libxext-dev \ 
+    libxext-dev \
     libxrandr-dev \
     libxi-dev \
     libxinerama-dev \
