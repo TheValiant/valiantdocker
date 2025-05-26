@@ -92,6 +92,15 @@ RUN apt-get update && apt-get upgrade -y && \
     clang-tools-21 \
     clang-tidy-21 \
     clang-21 \
+    libbsd-dev \
+    build-essential \
+    libx11-dev \
+    libxext-dev 
+    libxrandr-dev \
+    libxi-dev \
+    libxinerama-dev \
+    libxcursor-dev \
+    xorg-dev \
     libreadline-dev && \
     apt-get clean
 
