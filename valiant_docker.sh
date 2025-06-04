@@ -94,6 +94,7 @@ RUN apt-get update && apt-get upgrade -y && \
     clang-21 \
     libbsd-dev \
     build-essential \
+    netcat-openbsd \
     libx11-dev \
     libxext-dev \
     libxrandr-dev \
