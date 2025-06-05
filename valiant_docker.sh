@@ -149,7 +149,8 @@ RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-21 100 \\
 RUN sh -c "\$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
 # Add aliases to .zshrc
-RUN echo "alias val='valgrind --leak-check=full --leak-resolution=high -s --show-leak-kinds=all --leak-check-heuristics=all --num-callers=500 --sigill-diagnostics=yes --track-origins=yes --undef-value-errors=yes'" >> ~/.zshrc
+RUN echo "alias val='valgrind --leak-check=full --leak-resolution=high -s --show-leak-kinds=all --leak-check-heuristics=all --num-callers=500 --sigill-diagnostics=yes --track-origins=yes --undef-value-errors=yes'" >> ~/.zshrc && \\
+    echo "alias valreaper='valgrind --leak-check=full --leak-resolution=high -s --track-origins=yes --num-callers=500 --show-mismatched-frees=yes --show-leak-kinds=all --track-fds=yes --trace-children=yes --gen-suppressions=no --error-limit=no --undef-value-errors=yes --expensive-definedness-checks=yes --malloc-fill=0x41 --free-fill=0x42 --read-var-info=yes --keep-debuginfo=yes --show-realloc-size-zero=yes --partial-loads-ok=no'" >> ~/.zshrc
 
 ENV TSAN_OPTIONS="second_deadlock_stack=1,history_size=7,memory_limit_mb=4096,detect_deadlocks=1" ASAN_OPTIONS="detect_leaks=1,leak_check_at_exit=true,leak_check=true,debug=true"
 ENV TERM="xterm-256color"
