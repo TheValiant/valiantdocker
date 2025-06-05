@@ -1,35 +1,67 @@
 #!/bin/bash
 
-printf "\033[31mChecking if Docker is running...\033[0m\n"
+# Configuration variables
+DOCKER_IMAGE="debian:experimental"
+DOCKER_NAME="valiant-img"
+VALIANT_DIR="${HOME}/Documents/valiant_docker"
+ALIASES_FILE="${HOME}/.valiant_aliases"
+SHELL_RC="${HOME}/.zshrc"
 
-if ! pgrep -x "dockerd" > /dev/null; then
-    printf "\033[31mDocker is not running. Starting Docker...\033[0m\n"
-    if [[ "${OSTYPE}" == "darwin"* ]]; then
-        mkdir -p ~/goinfre/com.docker.docker && rm -rf ~/Library/Containers/com.docker.docker && ln -s ~/goinfre/com.docker.docker ~/Library/Containers/com.docker.docker && open -a /Applications/Docker.app
-    else
-        sudo systemctl start docker
+# Color codes
+RED="\033[31m"
+GREEN="\033[32m"
+YELLOW="\033[33m"
+RESET="\033[0m"
+
+# Print message with color
+print_msg() {
+    local color="$1"
+    local message="$2"
+    # Fix for SC2059 - don't use variables in printf format string
+    printf "%b%s%b\n" "${color}" "${message}" "${RESET}"
+}
+
+# Handle errors
+handle_error() {
+    print_msg "${RED}" "ERROR: $1"
+    exit 1
+}
+
+# Check if docker is running and start if needed
+ensure_docker_running() {
+    print_msg "${RED}" "Checking if Docker is running..."
+    
+    if ! docker info > /dev/null 2>&1; then
+        print_msg "${RED}" "Docker is not running. Starting Docker..."
+        if [[ "${OSTYPE}" == "darwin"* ]]; then
+            mkdir -p ~/goinfre/com.docker.docker && rm -rf ~/Library/Containers/com.docker.docker && ln -s ~/goinfre/com.docker.docker ~/Library/Containers/com.docker.docker && open -a /Applications/Docker.app
+        else
+            sudo systemctl start docker || handle_error "Failed to start Docker"
+        fi
+
+        print_msg "${RED}" "Waiting for Docker to launch..."
+        local max_attempts=30
+        local attempts=0
+        while ! docker info > /dev/null 2>&1; do
+            sleep 1
+            attempts=$((attempts + 1))
+            if [[ ${attempts} -ge ${max_attempts} ]]; then
+                handle_error "Docker failed to start after ${max_attempts} seconds"
+            fi
+        done
     fi
 
-    printf "\033[31mWaiting for Docker to launch...\033[0m\n"
-    while ! docker system info > /dev/null 2>&1; do
-        sleep 1
-    done
-fi
+    print_msg "${GREEN}" "Docker is running."
+}
 
-printf "\033[32mDocker is running.\033[0m\n"
-printf "\033[31mPulling debian:experimental image...\033[0m\n"
-docker pull debian:experimental
-
-printf "\033[31mAppending the aliases to ~/.valiant_aliases \033[0m\n"
-
-if [[ -f ~/.valiant_aliases ]]; then
-    /bin/rm ~/.valiant_aliases
-fi
-
-/bin/cat <<EOL > ~/.valiant_aliases
-alias valiant-build='docker build -t valiant-img ~/Documents/valiant_docker/'
-alias valiant-start='docker run -v \$(pwd):/app -it valiant-img'
-alias edit-valias='vim ~/.valiant_aliases'
+# Create aliases file
+setup_aliases() {
+    print_msg "${RED}" "Setting up aliases in ${ALIASES_FILE}"
+    
+    cat > "${ALIASES_FILE}" <<EOL
+alias valiant-build='docker build -t ${DOCKER_NAME} ${VALIANT_DIR}/'
+alias valiant-start='docker run -v \$(pwd):/app -it ${DOCKER_NAME}'
+alias edit-valias='vim ${ALIASES_FILE}'
 
 dock() {
     mkdir -p ~/goinfre/com.docker.docker
@@ -38,77 +70,79 @@ dock() {
     open -a /Applications/Docker.app
 }
 
-alias sz='source ~/.zshrc'
-alias vza='vim ~/.valiant_aliases'
-alias edit_docker='vim ~/Documents/valiant_docker/Dockerfile'
+alias sz='source ${SHELL_RC}'
+alias vza='vim ${ALIASES_FILE}'
+alias edit_docker='vim ${VALIANT_DIR}/Dockerfile'
 EOL
 
-printf "\033[32mAppending success.\033[0m\n"
+    print_msg "${GREEN}" "Aliases created successfully."
+}
 
-printf "\033[31mAppending to ~/.zshrc to source the aliases\033[0m\n"
+# Update shell configuration
+update_shell_config() {
+    print_msg "${RED}" "Updating ${SHELL_RC} to source the aliases"
+    
+    if ! grep -Fxq "source ${ALIASES_FILE}" "${SHELL_RC}"; then
+        print_msg "${YELLOW}" "Adding source line to ${SHELL_RC}"
+        echo "source ${ALIASES_FILE}" >> "${SHELL_RC}" || handle_error "Failed to update ${SHELL_RC}"
+    else
+        print_msg "${GREEN}" "${SHELL_RC} already configured"
+    fi
+    
+    print_msg "${GREEN}" "Shell configuration updated successfully."
+}
 
-if ! grep -Fxq "source ~/.valiant_aliases" ~/.zshrc; then
-    echo "source ~/.valiant_aliases" >> ~/.zshrc
-fi
+# Create Dockerfile
+create_dockerfile() {
+    print_msg "${RED}" "Creating the Dockerfile"
+    
+    if [[ ! -d "${VALIANT_DIR}" ]]; then
+        mkdir -p "${VALIANT_DIR}" || handle_error "Failed to create directory ${VALIANT_DIR}"
+    fi
 
-printf "\033[32mAppending success.\033[0m\n"
+    if [[ -f "${VALIANT_DIR}/Dockerfile" ]]; then
+        print_msg "${YELLOW}" "Dockerfile already exists, overwriting"
+    fi
 
-printf "\033[31mCreating the Dockerfile\033[0m\n"
-
-if [[ ! -d ~/Documents/valiant_docker ]]; then
-    mkdir -p ~/Documents/valiant_docker
-fi
-
-if [[ -f ~/Documents/valiant_docker/Dockerfile ]]; then
-    printf "\033[31mDockerfile already exists, overwriting\033[0m\n"
-    /bin/rm ~/Documents/valiant_docker/Dockerfile
-fi
-
-cat <<EOF > ~/Documents/valiant_docker/Dockerfile
+    cat > "${VALIANT_DIR}/Dockerfile" <<EOF
 FROM debian:experimental
 
 RUN echo "deb http://deb.debian.org/debian/ experimental main contrib non-free non-free-firmware" > /etc/apt/sources.list.d/experimental.list
 
 # Install packages (including zsh-theme-powerlevel9k)
-RUN apt-get update && apt-get upgrade -y && \
-    apt-get install --no-install-recommends --no-install-suggests -y \
-    gcc \
-    make \
-    gdb \
-    valgrind \
-    cppcheck \
-    ltrace \
-    strace \
-    vim \
-    zsh \
-    curl \
-    ca-certificates \
-    git \
-    bear \
-    g++ \
-    zsh-theme-powerlevel9k \
-    llvm-21 \
-    libclang-rt-21-dev \
-    clang-tools-21 \
-    clang-tidy-21 \
-    clang-21 \
-    libbsd-dev \
-    build-essential \
-    netcat-openbsd \
-    libx11-dev \
-    libxext-dev \
-    libxrandr-dev \
-    libxi-dev \
-    libxinerama-dev \
-    libxcursor-dev \
-    xorg-dev \
-    libreadline-dev && \
+RUN apt-get update && apt-get upgrade -y && \\
+    apt-get install --no-install-recommends --no-install-suggests -y \\
+    gcc \\
+    make \\
+    gdb \\
+    valgrind \\
+    cppcheck \\
+    ltrace \\
+    strace \\
+    vim \\
+    zsh \\
+    curl \\
+    ca-certificates \\
+    git \\
+    bear \\
+    g++ \\
+    zsh-theme-powerlevel9k \\
+    llvm-21 \\
+    libclang-rt-21-dev \\
+    clang-tools-21 \\
+    clang-tidy-21 \\
+    clang-21 \\
+    libbsd-dev \\
+    build-essential \\
+    netcat-openbsd \\
+    shellcheck \\
+    libreadline-dev && \\
     apt-get clean
 
-RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-21 100 \
-    && update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-21 100 \
-    && update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-21 100 \
-    && update-alternatives --install /usr/bin/cc cc /usr/bin/clang 100 \
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-21 100 \\
+    && update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-21 100 \\
+    && update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-21 100 \\
+    && update-alternatives --install /usr/bin/cc cc /usr/bin/clang 100 \\
     && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++ 100
 
 # Install Oh My Zsh
@@ -124,11 +158,26 @@ WORKDIR /app/
 CMD ["/bin/zsh"]
 EOF
 
-printf "\033[32mDockerfile created.\033[0m\n"
+    print_msg "${GREEN}" "Dockerfile created successfully."
+}
 
-printf "\033[32m Install success, restart the open terminals to be able to use the image\033[0m\n"
+# Main script
+main() {
+    ensure_docker_running
+    
+    print_msg "${RED}" "Pulling ${DOCKER_IMAGE} image..."
+    docker pull "${DOCKER_IMAGE}" || handle_error "Failed to pull Docker image"
+    
+    setup_aliases
+    update_shell_config
+    create_dockerfile
+    
+    print_msg "${GREEN}" "Setup complete! Restart your terminal to use the new aliases."
+    print_msg "${GREEN}" "Run 'dock' to start docker"
+    print_msg "${GREEN}" "Run 'valiant-build' to build the image"
+    print_msg "${GREEN}" "Run 'valiant-start' to start the container"
+    print_msg "${GREEN}" "Run 'edit-valias' to edit the aliases"
+}
 
-printf "\033[32m Run dock to start docker\033[0m\n"
-printf "\033[32m Run valiant-build to build the image\033[0m\n"
-printf "\033[32m Run valiant-start to start the container\033[0m\n"
-printf "\033[32m Run edit-valias to edit the aliases\033[0m\n"
+# Run the script
+main
