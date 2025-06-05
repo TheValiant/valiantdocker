@@ -4,7 +4,7 @@ printf "\033[31mChecking if Docker is running...\033[0m\n"
 
 if ! pgrep -x "dockerd" > /dev/null; then
     printf "\033[31mDocker is not running. Starting Docker...\033[0m\n"
-    if [[ "$OSTYPE" == "darwin"* ]]; then
+    if [[ "${OSTYPE}" == "darwin"* ]]; then
         mkdir -p ~/goinfre/com.docker.docker && rm -rf ~/Library/Containers/com.docker.docker && ln -s ~/goinfre/com.docker.docker ~/Library/Containers/com.docker.docker && open -a /Applications/Docker.app
     else
         sudo systemctl start docker
@@ -22,7 +22,7 @@ docker pull debian:experimental
 
 printf "\033[31mAppending the aliases to ~/.valiant_aliases \033[0m\n"
 
-if [ -f ~/.valiant_aliases ]; then
+if [[ -f ~/.valiant_aliases ]]; then
     /bin/rm ~/.valiant_aliases
 fi
 
@@ -55,11 +55,11 @@ printf "\033[32mAppending success.\033[0m\n"
 
 printf "\033[31mCreating the Dockerfile\033[0m\n"
 
-if [ ! -d ~/Documents/valiant_docker ]; then
+if [[ ! -d ~/Documents/valiant_docker ]]; then
     mkdir -p ~/Documents/valiant_docker
 fi
 
-if [ -f ~/Documents/valiant_docker/Dockerfile ]; then
+if [[ -f ~/Documents/valiant_docker/Dockerfile ]]; then
     printf "\033[31mDockerfile already exists, overwriting\033[0m\n"
     /bin/rm ~/Documents/valiant_docker/Dockerfile
 fi
