@@ -1,6 +1,5 @@
 # valiantdocker
 ### A Linux based docker container containing valgrind and other usefull tools not installed by default. 
-#### Mainly usefull for running valgrind in 42 lab computers, which can then be used to test for memory leaks.
 
 ## Installation
 Run the following command to automatically download the script and install the docker image.
