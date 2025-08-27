@@ -4,7 +4,9 @@
 ## Installation
 Run the following command to automatically download the script and install the docker image.
 
-``sh -c "$(curl -L https://raw.githubusercontent.com/assemblycalamity/valiantdocker/refs/heads/main/valiant_docker.sh)"``
+```
+sh -c "$(curl -L https://raw.githubusercontent.com/assemblycalamity/valiantdocker/refs/heads/main/valiant_docker.sh)"
+```
 
 ## Features
 - Valgrind memory analysis tools
