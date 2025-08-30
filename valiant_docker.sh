@@ -136,6 +136,7 @@ RUN apt-get update && apt-get upgrade -y && \\
     build-essential \\
     netcat-openbsd \\
     shellcheck \\
+    g++        \\
     libreadline-dev && \\
     apt-get clean
 
