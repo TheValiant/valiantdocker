@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration variables
-DOCKER_IMAGE="debian:experimental"
+DOCKER_IMAGE="alpine:experimental"
 DOCKER_NAME="valiant-img"
 VALIANT_DIR="${HOME}/Documents/valiant_docker"
 ALIASES_FILE="${HOME}/.valiant_aliases"
@@ -105,52 +105,43 @@ create_dockerfile() {
     fi
 
     cat > "${VALIANT_DIR}/Dockerfile" <<EOF
-FROM debian:experimental
+FROM alpine:experimental
 
-RUN echo "deb http://deb.debian.org/debian/ experimental main contrib non-free non-free-firmware" > /etc/apt/sources.list.d/experimental.list
+# Use edge repositories (including testing) to access newer packages
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/edge/main" > /etc/apk/repositories && \
+    echo "https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
+    echo "https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
 
-# Install packages (including zsh-theme-powerlevel9k)
-RUN apt-get update && apt-get upgrade -y && \\
-    apt-get install --no-install-recommends --no-install-suggests -y \\
-    gcc \\
-    make \\
-    gdb \\
-    valgrind \\
-    cppcheck \\
-    ltrace \\
-    strace \\
-    vim \\
-    zsh \\
-    curl \\
-    ca-certificates \\
-    git \\
-    bear \\
-    g++ \\
-    zsh-theme-powerlevel9k \\
-    llvm-21 \\
-    libclang-rt-21-dev \\
-    clang-tools-21 \\
-    clang-tidy-21 \\
-    clang-21 \\
-    libbsd-dev \\
-    build-essential \\
-    netcat-openbsd \\
-    shellcheck \\
-    g++        \\
-    libreadline-dev && \\
-    apt-get clean
+# Install packages
+RUN apk update && apk upgrade --no-cache && \
+    apk add --no-cache \
+        build-base \
+        gdb \
+        valgrind \
+        cppcheck \
+        ltrace \
+        strace \
+        vim \
+        zsh \
+        curl \
+        ca-certificates \
+        git \
+        bear \
+        clang \
+        clang-extra-tools \
+        llvm \
+        compiler-rt \
+        libbsd \
+        libbsd-dev \
+        netcat-openbsd \
+        shellcheck \
+        readline-dev
 
-RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-21 100 \\
-    && update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-21 100 \\
-    && update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-21 100 \\
-    && update-alternatives --install /usr/bin/cc cc /usr/bin/clang 100 \\
-    && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++ 100
-
-# Install Oh My Zsh
-RUN sh -c "\$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+# Install Oh My Zsh (non-interactive)
+RUN CHSH=no RUNZSH=no KEEP_ZSHRC=yes sh -c "\$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
 # Add aliases to .zshrc
-RUN echo "alias val='valgrind --leak-check=full --leak-resolution=high -s --show-leak-kinds=all --leak-check-heuristics=all --num-callers=500 --sigill-diagnostics=yes --track-origins=yes --undef-value-errors=yes'" >> ~/.zshrc && \\
+RUN echo "alias val='valgrind --leak-check=full --leak-resolution=high -s --show-leak-kinds=all --leak-check-heuristics=all --num-callers=500 --sigill-diagnostics=yes --track-origins=yes --undef-value-errors=yes'" >> ~/.zshrc && \
     echo "alias valreaper='valgrind --leak-check=full --leak-resolution=high -s --track-origins=yes --num-callers=500 --show-mismatched-frees=yes --show-leak-kinds=all --track-fds=yes --trace-children=yes --gen-suppressions=no --error-limit=no --undef-value-errors=yes --expensive-definedness-checks=yes --malloc-fill=0x41 --free-fill=0x42 --read-var-info=yes --keep-debuginfo=yes --show-realloc-size-zero=yes --partial-loads-ok=no'" >> ~/.zshrc
 
 ENV TSAN_OPTIONS="second_deadlock_stack=1,history_size=7,memory_limit_mb=4096,detect_deadlocks=1" ASAN_OPTIONS="detect_leaks=1,leak_check_at_exit=true,leak_check=true,debug=true"
