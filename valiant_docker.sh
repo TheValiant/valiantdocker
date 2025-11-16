@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration variables
-DOCKER_IMAGE="alpine:experimental"
+DOCKER_IMAGE="alpine:edge"
 DOCKER_NAME="valiant-img"
 VALIANT_DIR="${HOME}/Documents/valiant_docker"
 ALIASES_FILE="${HOME}/.valiant_aliases"
@@ -165,7 +165,7 @@ create_dockerfile() {
     fi
 
     cat > "${VALIANT_DIR}/Dockerfile" <<EOF
-FROM alpine:experimental
+FROM alpine:edge
 
 # Use edge repositories (including testing) to access newer packages
 RUN echo "https://dl-cdn.alpinelinux.org/alpine/edge/main" > /etc/apk/repositories && \
