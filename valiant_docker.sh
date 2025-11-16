@@ -5,7 +5,18 @@ DOCKER_IMAGE="alpine:experimental"
 DOCKER_NAME="valiant-img"
 VALIANT_DIR="${HOME}/Documents/valiant_docker"
 ALIASES_FILE="${HOME}/.valiant_aliases"
-SHELL_RC="${HOME}/.zshrc"
+
+# Auto-detect shell configuration file
+if [ -n "$BASH_VERSION" ]; then
+    SHELL_RC="${HOME}/.bashrc"
+    SHELL_NAME="bash"
+elif [ -n "$ZSH_VERSION" ]; then
+    SHELL_RC="${HOME}/.zshrc"
+    SHELL_NAME="zsh"
+else
+    echo "ERROR: Unsupported shell. Only Bash and Zsh are supported."
+    exit 1
+fi
 
 # Color codes
 RED="\033[31m"
@@ -17,7 +28,6 @@ RESET="\033[0m"
 print_msg() {
     local color="$1"
     local message="$2"
-    # Fix for SC2059 - don't use variables in printf format string
     printf "%b%s%b\n" "${color}" "${message}" "${RESET}"
 }
 
@@ -29,17 +39,33 @@ handle_error() {
 
 # Check if docker is running and start if needed
 ensure_docker_running() {
-    print_msg "${RED}" "Checking if Docker is running..."
+    print_msg "${YELLOW}" "Checking if Docker is running..."
     
     if ! docker info > /dev/null 2>&1; then
-        print_msg "${RED}" "Docker is not running. Starting Docker..."
+        print_msg "${YELLOW}" "Docker is not running. Starting Docker..."
         if [[ "${OSTYPE}" == "darwin"* ]]; then
-            mkdir -p ~/goinfre/com.docker.docker && rm -rf ~/Library/Containers/com.docker.docker && ln -s ~/goinfre/com.docker.docker ~/Library/Containers/com.docker.docker && open -a /Applications/Docker.app
+            # Check if goinfre exists (42 school environment)
+            if [[ -d "${HOME}/goinfre" ]]; then
+                print_msg "${YELLOW}" "Detected goinfre directory, using it for Docker..."
+                mkdir -p "${HOME}/goinfre/com.docker.docker"
+                rm -rf "${HOME}/Library/Containers/com.docker.docker"
+                ln -s "${HOME}/goinfre/com.docker.docker" "${HOME}/Library/Containers/com.docker.docker"
+            fi
+            open -a /Applications/Docker.app || handle_error "Failed to start Docker app"
         else
-            sudo systemctl start docker || handle_error "Failed to start Docker"
+            # Try multiple methods to start Docker on Linux
+            if command -v systemctl > /dev/null 2>&1; then
+                print_msg "${YELLOW}" "Using systemctl to start Docker..."
+                sudo systemctl start docker || handle_error "Failed to start Docker with systemctl"
+            elif command -v service > /dev/null 2>&1; then
+                print_msg "${YELLOW}" "Using service to start Docker..."
+                sudo service docker start || handle_error "Failed to start Docker with service"
+            else
+                handle_error "Could not determine how to start Docker on this system"
+            fi
         fi
 
-        print_msg "${RED}" "Waiting for Docker to launch..."
+        print_msg "${YELLOW}" "Waiting for Docker to launch..."
         local max_attempts=30
         local attempts=0
         while ! docker info > /dev/null 2>&1; do
@@ -56,7 +82,19 @@ ensure_docker_running() {
 
 # Create aliases file
 setup_aliases() {
-    print_msg "${RED}" "Setting up aliases in ${ALIASES_FILE}"
+    print_msg "${YELLOW}" "Setting up aliases in ${ALIASES_FILE}"
+    
+    # Check if file exists and prompt
+    if [[ -f "${ALIASES_FILE}" ]]; then
+        print_msg "${YELLOW}" "Aliases file already exists."
+        read -p "Do you want to overwrite it? (y/N) " -n 1 -r
+        echo # move to a new line
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_msg "${GREEN}" "Skipping aliases file creation."
+            return
+        fi
+        print_msg "${YELLOW}" "Overwriting aliases file..."
+    fi
     
     cat > "${ALIASES_FILE}" <<EOL
 alias valiant-build='docker build -t ${DOCKER_NAME} ${VALIANT_DIR}/'
@@ -64,10 +102,25 @@ alias valiant-start='docker run -v \$(pwd):/app -it ${DOCKER_NAME}'
 alias edit-valias='vim ${ALIASES_FILE}'
 
 dock() {
-    mkdir -p ~/goinfre/com.docker.docker
-    rm -rf ~/Library/Containers/com.docker.docker
-    ln -s ~/goinfre/com.docker.docker ~/Library/Containers/com.docker.docker
+EOL
+
+    # Add macOS-specific dock function if on macOS
+    if [[ "${OSTYPE}" == "darwin"* ]]; then
+        cat >> "${ALIASES_FILE}" <<EOL
+    if [[ -d "\${HOME}/goinfre" ]]; then
+        mkdir -p "\${HOME}/goinfre/com.docker.docker"
+        rm -rf "\${HOME}/Library/Containers/com.docker.docker"
+        ln -s "\${HOME}/goinfre/com.docker.docker" "\${HOME}/Library/Containers/com.docker.docker"
+    fi
     open -a /Applications/Docker.app
+EOL
+    else
+        cat >> "${ALIASES_FILE}" <<EOL
+    echo "dock function is only available on macOS"
+EOL
+    fi
+
+    cat >> "${ALIASES_FILE}" <<EOL
 }
 
 alias sz='source ${SHELL_RC}'
@@ -80,7 +133,7 @@ EOL
 
 # Update shell configuration
 update_shell_config() {
-    print_msg "${RED}" "Updating ${SHELL_RC} to source the aliases"
+    print_msg "${YELLOW}" "Updating ${SHELL_RC} to source the aliases"
     
     if ! grep -Fxq "source ${ALIASES_FILE}" "${SHELL_RC}"; then
         print_msg "${YELLOW}" "Adding source line to ${SHELL_RC}"
@@ -94,14 +147,21 @@ update_shell_config() {
 
 # Create Dockerfile
 create_dockerfile() {
-    print_msg "${RED}" "Creating the Dockerfile"
+    print_msg "${YELLOW}" "Creating the Dockerfile"
     
     if [[ ! -d "${VALIANT_DIR}" ]]; then
         mkdir -p "${VALIANT_DIR}" || handle_error "Failed to create directory ${VALIANT_DIR}"
     fi
 
     if [[ -f "${VALIANT_DIR}/Dockerfile" ]]; then
-        print_msg "${YELLOW}" "Dockerfile already exists, overwriting"
+        print_msg "${YELLOW}" "Dockerfile already exists."
+        read -p "Do you want to overwrite it? (y/N) " -n 1 -r
+        echo # move to a new line
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_msg "${GREEN}" "Skipping Dockerfile creation."
+            return
+        fi
+        print_msg "${YELLOW}" "Overwriting Dockerfile..."
     fi
 
     cat > "${VALIANT_DIR}/Dockerfile" <<EOF
@@ -154,23 +214,104 @@ EOF
     print_msg "${GREEN}" "Dockerfile created successfully."
 }
 
+# Uninstall function
+uninstall() {
+    print_msg "${YELLOW}" "Starting uninstallation..."
+    
+    # Remove aliases file
+    if [[ -f "${ALIASES_FILE}" ]]; then
+        rm -f "${ALIASES_FILE}"
+        print_msg "${GREEN}" "Removed ${ALIASES_FILE}"
+    fi
+    
+    # Remove source line from shell RC
+    if [[ -f "${SHELL_RC}" ]]; then
+        if grep -Fxq "source ${ALIASES_FILE}" "${SHELL_RC}"; then
+            # Create a backup
+            cp "${SHELL_RC}" "${SHELL_RC}.backup"
+            grep -Fxv "source ${ALIASES_FILE}" "${SHELL_RC}" > "${SHELL_RC}.tmp"
+            mv "${SHELL_RC}.tmp" "${SHELL_RC}"
+            print_msg "${GREEN}" "Removed source line from ${SHELL_RC} (backup at ${SHELL_RC}.backup)"
+        fi
+    fi
+    
+    # Ask about Docker directory
+    if [[ -d "${VALIANT_DIR}" ]]; then
+        read -p "Do you want to remove ${VALIANT_DIR}? (y/N) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            rm -rf "${VALIANT_DIR}"
+            print_msg "${GREEN}" "Removed ${VALIANT_DIR}"
+        else
+            print_msg "${YELLOW}" "Kept ${VALIANT_DIR}"
+        fi
+    fi
+    
+    # Ask about Docker image and container
+    if docker images | grep -q "${DOCKER_NAME}"; then
+        read -p "Do you want to remove the Docker image '${DOCKER_NAME}'? (y/N) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            docker rmi "${DOCKER_NAME}" 2>/dev/null || print_msg "${YELLOW}" "Image may still be in use"
+            print_msg "${GREEN}" "Attempted to remove Docker image"
+        fi
+    fi
+    
+    print_msg "${GREEN}" "Uninstallation complete!"
+}
+
+# Show usage
+usage() {
+    cat <<EOF
+Usage: $0 [OPTIONS]
+
+Options:
+    --uninstall    Remove all installed files and configurations
+    --help         Show this help message
+
+Without options, the script will set up the Valiant Docker environment.
+EOF
+    exit 0
+}
+
 # Main script
 main() {
+    # Parse arguments
+    if [[ $# -gt 0 ]]; then
+        case "$1" in
+            --uninstall)
+                uninstall
+                exit 0
+                ;;
+            --help)
+                usage
+                ;;
+            *)
+                print_msg "${RED}" "Unknown option: $1"
+                usage
+                ;;
+        esac
+    fi
+    
     ensure_docker_running
     
-    print_msg "${RED}" "Pulling ${DOCKER_IMAGE} image..."
+    print_msg "${YELLOW}" "Pulling ${DOCKER_IMAGE} image..."
     docker pull "${DOCKER_IMAGE}" || handle_error "Failed to pull Docker image"
     
     setup_aliases
     update_shell_config
     create_dockerfile
     
-    print_msg "${GREEN}" "Setup complete! Restart your terminal to use the new aliases."
-    print_msg "${GREEN}" "Run 'dock' to start docker"
+    print_msg "${GREEN}" "Setup complete! Restart your terminal or run 'source ${SHELL_RC}' to use the new aliases."
+    print_msg "${GREEN}" "Detected shell: ${SHELL_NAME}"
+    if [[ "${OSTYPE}" == "darwin"* ]]; then
+        print_msg "${GREEN}" "Run 'dock' to start Docker"
+    fi
     print_msg "${GREEN}" "Run 'valiant-build' to build the image"
     print_msg "${GREEN}" "Run 'valiant-start' to start the container"
     print_msg "${GREEN}" "Run 'edit-valias' to edit the aliases"
+    print_msg "${YELLOW}" "To uninstall, run: $0 --uninstall"
 }
 
 # Run the script
-main
+main "$@"
